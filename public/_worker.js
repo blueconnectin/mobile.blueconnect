@@ -58,6 +58,7 @@ export function getMember(uid, env) {
   if (!member || member.active !== true) throw failure('ACCESS_DENIED', 403);
   // Configuration is written by an administrator, never accepted from the client.
   return { name: typeof member.name === 'string' ? member.name : '',
+    projectUserId: typeof member.project?.userId === 'string' ? member.project.userId : '',
     project: member.project?.enabled === true && typeof member.project.userId === 'string' && Boolean(member.project.userId),
     payment: member.payment?.enabled === true };
 }
@@ -66,14 +67,19 @@ function json(value, status = 200) {
 }
 export async function handle(request, env, verifier = verifyToken) {
   const url = new URL(request.url);
-  if (url.pathname === '/api/me') {
+  if (url.pathname === '/api/me' || url.pathname === '/api/project/identity') {
     if (request.method !== 'GET') return json({ error: 'METHOD_NOT_ALLOWED' }, 405);
     const authorization = request.headers.get('Authorization') || '';
     if (!authorization.startsWith('Bearer ') || authorization.length > 16007) return json({ error: 'UNAUTHENTICATED' }, 401);
     try {
       const claims = await verifier(authorization.slice(7));
       const member = getMember(claims.sub, env);
-      return json({ user: { uid: claims.sub, name: member.name }, apps: { project: member.project, payment: member.payment }, sso: { project: false, payment: false } });
+      if (url.pathname === '/api/project/identity') {
+        if (env.PROJECT_SSO_ENABLED !== 'true') return json({ error: 'SSO_DISABLED' }, 503);
+        if (!member.project) return json({ error: 'ACCESS_DENIED' }, 403);
+        return json({ audience: 'blueconnect-project', uid: claims.sub, userId: member.projectUserId, expiresAt: claims.exp });
+      }
+      return json({ user: { uid: claims.sub, name: member.name }, apps: { project: member.project, payment: member.payment }, sso: { project: member.project && env.PROJECT_SSO_ENABLED === 'true', payment: false } });
     } catch (error) { return json({ error: error.status ? error.message : 'SERVICE_UNAVAILABLE' }, error.status || 503); }
   }
   if (url.pathname.startsWith('/api/')) return json({ error: 'NOT_FOUND' }, 404);
