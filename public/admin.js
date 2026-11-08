@@ -4,13 +4,14 @@ const config={apiKey:'AIzaSyAGyE8As4XjSDUI6Z-as__kZ4D6y88k2ag',authDomain:'blue-
 const auth=getAuth(initializeApp(config));
 const $=id=>document.getElementById(id);
 const message=text=>{$('message').textContent=text;};
-const errors={VERIFICATION_REQUIRED:'Klik Verifikasi lagi; hasil verifikasi berlaku 5 menit dan hanya untuk admin yang memeriksa.',PROJECT_ROLE_MISMATCH:'Peran akun Project berbeda dari usulan. Batalkan dan buat permintaan dengan peran akun yang benar.',PROJECT_ACCOUNT_CHANGED:'Identitas akun berubah setelah diperiksa. Verifikasi ulang.',PROJECT_VERIFICATION_FAILED:'Project belum dapat memverifikasi akun. Pastikan ID, peran, status aktif, dan deployment backend benar.',PROJECT_CONNECTION_FAILED:'Koneksi Project gagal. Coba Verifikasi kembali.',EXISTING_LINK_REASSIGNMENT_BLOCKED:'Pegawai sudah memiliki hubungan akun lain. Pemindahan hubungan perlu penanganan khusus.',PAYMENT_CONNECTOR_NOT_READY:'Konektor Payment belum diaktifkan.',ADMIN_REQUIRED:'Akun Anda tidak memiliki akses administrator.',DATABASE_NOT_CONFIGURED:'Penyimpanan pengaturan belum diaktifkan. Ikuti panduan aktivasi administrator.',ACCESS_DENIED:'Akses akun dinonaktifkan.',USER_ALREADY_EXISTS:'Pengguna sudah terdaftar.',REQUEST_ALREADY_PENDING:'Sudah ada pengaturan koneksi yang menunggu verifikasi.',ACCOUNT_ALREADY_LINKED:'Akun lama telah dihubungkan ke pengguna lain.',CONFLICT_REFRESH_REQUIRED:'Data berubah. Muat ulang sebelum menyimpan.',ADMIN_DEACTIVATION_REQUIRES_CONFIGURATION:'Akun administrator dilindungi. Ubah penetapan admin melalui konfigurasi pemilik.'};
+const errors={PROJECT_RESPONSE_NOT_JSON:'Backend Project mengirim halaman web, bukan respons API. Periksa deployment Apps Script dan akses web app.',PROJECT_GOOGLE_AUTH_REQUIRED:'Apps Script Project memerlukan otorisasi Google. Jalankan authorizePortalConnection_ sebagai pemilik deployment dan setujui izinnya.',PROJECT_ADMIN_AUTH_FAILED:'Backend Project belum berhasil memvalidasi akun admin melalui Mobile. Periksa izin koneksi Apps Script dan akses akun admin.',PROJECT_USER_NOT_FOUND:'ID akun Project tidak ditemukan. Periksa USER_ID pada sheet USERS.',PROJECT_ACCOUNT_ROLE_OR_STATUS_CHANGED:'Peran atau status akun Project tidak sesuai. Pastikan akun AKTIF dan perannya sama dengan usulan.',PROJECT_BACKEND_OUTDATED:'Deployment backend Project belum menyediakan fungsi verifikasi. Periksa deployment Apps Script terbaru.',PROJECT_UPSTREAM_REJECTED:'Server Project menolak permintaan. Periksa akses deployment Apps Script.',VERIFICATION_REQUIRED:'Klik Verifikasi lagi; hasil verifikasi berlaku 5 menit dan hanya untuk admin yang memeriksa.',PROJECT_ROLE_MISMATCH:'Peran akun Project berbeda dari usulan. Batalkan dan buat permintaan dengan peran akun yang benar.',PROJECT_ACCOUNT_CHANGED:'Identitas akun berubah setelah diperiksa. Verifikasi ulang.',PROJECT_VERIFICATION_FAILED:'Project belum dapat memverifikasi akun. Pastikan ID, peran, status aktif, dan deployment backend benar.',PROJECT_CONNECTION_FAILED:'Koneksi Project gagal. Coba Verifikasi kembali.',EXISTING_LINK_REASSIGNMENT_BLOCKED:'Pegawai sudah memiliki hubungan akun lain. Pemindahan hubungan perlu penanganan khusus.',PAYMENT_CONNECTOR_NOT_READY:'Konektor Payment belum diaktifkan.',ADMIN_REQUIRED:'Akun Anda tidak memiliki akses administrator.',DATABASE_NOT_CONFIGURED:'Penyimpanan pengaturan belum diaktifkan. Ikuti panduan aktivasi administrator.',ACCESS_DENIED:'Akses akun dinonaktifkan.',USER_ALREADY_EXISTS:'Pengguna sudah terdaftar.',REQUEST_ALREADY_PENDING:'Sudah ada pengaturan koneksi yang menunggu verifikasi.',ACCOUNT_ALREADY_LINKED:'Akun lama telah dihubungkan ke pengguna lain.',CONFLICT_REFRESH_REQUIRED:'Data berubah. Muat ulang sebelum menyimpan.',ADMIN_DEACTIVATION_REQUIRES_CONFIGURATION:'Akun administrator dilindungi. Ubah penetapan admin melalui konfigurasi pemilik.'};
 let generation=0,busy=false;
 async function api(path,body){
  if(!auth.currentUser)throw Error('Silakan login melalui portal.');
  const token=await auth.currentUser.getIdToken();
  const response=await fetch('/api/admin/'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store'});
- const data=await response.json();if(!response.ok)throw Error(errors[data.error]||'Permintaan gagal. Periksa data dan coba lagi.');return data;
+ let data;try{data=await response.json();}catch{throw Error('Server mengirim respons yang tidak dapat dibaca. Muat ulang halaman dan coba kembali.');}
+ if(!response.ok){const code=typeof data.error==='string' && /^[A-Z_]{1,80}$/.test(data.error)?data.error:'';throw Error((errors[code]||'Permintaan gagal. Periksa data dan coba lagi.')+(code?' ['+code+']':''));}return data;
 }
 function node(tag,text){const el=document.createElement(tag);el.textContent=text;return el;}
 async function load(){
@@ -25,24 +26,24 @@ async function load(){
  if(!data.users.length)$('users').append(node('p','Belum ada pengguna yang didaftarkan melalui pengaturan ini. Akun konfigurasi awal tetap dipertahankan.'));
  for(const item of data.requests){const box=node('article','');box.append(node('p',item.application+' · '+item.uid+' · '+(item.mode==='link'?'Hubungkan '+item.legacy_id:'Profil baru')+' · '+item.requested_role+' · Menunggu verifikasi'));if(item.application==='project'){
  const verify=node('button','Verifikasi akun');verify.className='secondary';
- const preview=node('div','');
+ const preview=node('div','');preview.setAttribute('role','status');preview.setAttribute('aria-live','polite');
  verify.addEventListener('click',()=>action(async()=>{
-  preview.replaceChildren();const data=await api('verify-project-link',{id:item.id});
+  const data=await api('verify-project-link',{id:item.id});preview.replaceChildren();
   if(data.status==='applied'){await load();message('Hubungan akun sudah diterapkan.');return;}
   const profile=data.profile;
   preview.append(node('p','Pegawai: '+data.employee.name),node('p','Akun Project: '+profile.username+' · '+profile.userId),node('p','Nama: '+profile.name+' · Peran: '+profile.role+' · Status: '+profile.status));
   if(item.mode==='new')preview.append(node('p','Profil baru akan dibuat saat diterapkan.'));
-  const apply=node('button','Terapkan hubungan akun');
+  const apply=node('button','Terapkan hubungan akun');const applyFeedback=node('p','');applyFeedback.setAttribute('role','status');
   apply.addEventListener('click',()=>action(async()=>{
-   if(!confirm('Hubungkan '+data.employee.name+' ke '+profile.username+' ('+profile.role+')? Riwayat akun tujuan akan dapat diakses sesuai peran.'))return;
+   if(!confirm('Hubungkan '+data.employee.name+' ke '+profile.username+' ('+profile.role+')? Riwayat akun tujuan akan dapat diakses sesuai peran.')){applyFeedback.textContent='Penerapan dibatalkan.';return;}
    await api('apply-project-link',{id:item.id,confirmed:true});await load();message('Hubungan akun Project berhasil diterapkan. Kembali ke portal dan klik Periksa akses kembali.');
-  }));preview.append(apply);message('Periksa identitas akun sebelum menerapkan. Verifikasi berlaku 5 menit.');
- }));box.append(verify,preview);
+  },applyFeedback));preview.append(apply,applyFeedback);message('Periksa identitas akun sebelum menerapkan. Verifikasi berlaku 5 menit.');
+ },preview));box.append(verify,preview);
  }
  const cancel=node('button','Batalkan pengaturan');cancel.className='secondary';cancel.addEventListener('click',()=>action(async()=>{await api('cancel-request',{id:item.id});await load();message('Pengaturan dibatalkan. Anda dapat membuat pengaturan pengganti.');}));box.append(cancel);$('requests').append(box);}
  for(const item of log.events)$('audit').append(node('p',item.created_at+' · '+item.action+' · '+item.target_uid));
 }
-async function action(fn){if(busy)return;busy=true;document.querySelectorAll('button').forEach(b=>b.disabled=true);try{await fn();}catch(e){message(e.message||'Permintaan gagal.');}finally{busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false);}}
+async function action(fn,feedback){if(busy)return;busy=true;if(feedback)feedback.textContent='Memproses permintaan Project…';document.querySelectorAll('button').forEach(b=>b.disabled=true);try{await fn();}catch(e){const text=e.message||'Permintaan gagal.';message(text);if(feedback)feedback.textContent=text;}finally{busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false);}}
 $('refresh').addEventListener('click',()=>action(load));
 $('create-mode').addEventListener('change',()=>{$('uid-field').hidden=$('create-mode').value==='new';$('user-uid').required=$('create-mode').value==='existing';});
 $('user-form').addEventListener('submit',event=>{event.preventDefault();action(async()=>{
