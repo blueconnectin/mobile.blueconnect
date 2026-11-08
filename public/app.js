@@ -36,8 +36,43 @@ $('reset').addEventListener('click', () => {
   });
 });
 $('logout').addEventListener('click', () => perform(async () => { await signOut(auth); status('Anda sudah keluar dari portal.'); }));
+let accessGeneration = 0;
+async function loadAccess(user) {
+  const generation = ++accessGeneration;
+  $('project-link').hidden = true;
+  $('payment-link').hidden = true;
+  $('access-status').textContent = user ? 'Memeriksa akses…' : '';
+  if (!user) return;
+  try {
+    const token = await user.getIdToken();
+    const response = await fetch('/api/me', {
+      headers: { Authorization: 'Bearer ' + token },
+      cache: 'no-store'
+    });
+    if (generation !== accessGeneration) return;
+    if (!response.ok) {
+      $('access-status').textContent = response.status === 403
+        ? 'Akun belum mendapat akses atau sedang dinonaktifkan. Hubungi administrator.'
+        : response.status === 401 ? 'Sesi tidak valid. Silakan keluar dan masuk kembali.'
+        : 'Layanan akses belum siap. Hubungi administrator atau coba kembali.';
+      return;
+    }
+    const data = await response.json();
+    if (generation !== accessGeneration) return;
+    $('project-link').hidden = data.apps?.project !== true;
+    $('payment-link').hidden = data.apps?.payment !== true;
+    $('access-status').textContent = data.apps?.project || data.apps?.payment
+      ? 'Akses portal terverifikasi. Pilih aplikasi di bawah.'
+      : 'Akun aktif. Akses aplikasi belum ditetapkan oleh administrator.';
+  } catch {
+    if (generation === accessGeneration) $('access-status').textContent = 'Pemeriksaan akses gagal. Periksa koneksi dan coba kembali.';
+  }
+}
+$('retry-access').addEventListener('click', () => loadAccess(auth.currentUser));
 onAuthStateChanged(auth, user => {
   $('login').hidden = Boolean(user);
   $('home').hidden = !user;
   $('identity').textContent = user?.email || '';
+  loadAccess(user);
 });
+
