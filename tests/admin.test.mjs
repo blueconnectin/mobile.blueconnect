@@ -96,3 +96,14 @@ test('handled connector failures retain safe codes as failed dependencies',async
   }
  }finally{globalThis.fetch=original;}
 });
+test('password changes require admin, same origin, confirmation and existing user',async()=>{
+ const t=setup();await t.request('users',user);
+ const input={uid:user.uid,password:'example-password',confirmed:true};
+ await assert.rejects(t.request('user-password',input,'employee'),/ADMIN_REQUIRED/);
+ await assert.rejects(t.request('user-password',input,'admin','https://evil.example'),/ORIGIN_DENIED/);
+ await assert.rejects(t.request('user-password',{...input,confirmed:false}),/INVALID_USER/);
+ await assert.rejects(t.request('user-password',{...input,uid:'missing'}),/USER_NOT_FOUND/);
+ await assert.rejects(t.request('user-password',input),/PASSWORD_ADMIN_NOT_CONFIGURED/);
+ assert.doesNotMatch(JSON.stringify(await t.request('audit')),/example-password/);
+ t.sqlite.close();
+});

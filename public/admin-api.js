@@ -1,3 +1,4 @@
+import {setUserPassword,validatePassword} from './firebase-admin.js';
 import {ensureLinkTables,projectAuthorization,processProjectLink} from './project-links.js';
 // Imported only by the Worker. No credentials or data embedded in this module.
 export function isPortalAdmin(uid, env) {
@@ -49,6 +50,15 @@ export async function adminApi(request,env,claims){
  if(!input||typeof input!=='object'||Array.isArray(input))throw err('INVALID_JSON');
  if(url.pathname==='/api/admin/verify-project-link')return processProjectLink(request,env,claims,input,false);
  if(url.pathname==='/api/admin/apply-project-link')return processProjectLink(request,env,claims,input,true);
+ if(url.pathname==='/api/admin/user-password'){
+  if(typeof input.uid!=='string'||input.confirmed!==true)throw err('INVALID_USER');
+  validatePassword(input.password);
+  const target=await db.prepare('SELECT uid FROM portal_users WHERE uid=?').bind(input.uid).first();
+  if(!target)throw err('USER_NOT_FOUND',404);
+  await setUserPassword(env,input.uid,input.password);
+  try{await audit(db,claims.sub,'SET_PASSWORD',input.uid,{},at).run();}catch{return {success:true,auditRecorded:false};}
+  return {success:true,auditRecorded:true};
+ }
  if(url.pathname==='/api/admin/users'){
   const user=validateUser(input);
   if(!user.active && isPortalAdmin(user.uid,env))throw err('ADMIN_DEACTIVATION_REQUIRES_CONFIGURATION',409);
