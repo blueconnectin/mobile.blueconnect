@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.cjs tests/*.test.mjs",
-    "check": "node --check public/app.js && node --check public/_worker.js && node --check public/project-sso.js && node --check integrations/project/21_PortalSsoService.js && node --check integrations/project/portal-login.js && node --check scripts/install-project-sso.mjs"
+    "check": "node --check public/app.js && node --check public/_worker.js && node --check public/project-sso.js && node --check integrations/project/21_PortalSsoService.js && node --check integrations/project/portal-login.js && node --check scripts/install-project-sso.mjs && node --check public/admin-api.js && node --check public/admin.js"
   },
   "engines": {
     "node": ">=22"
