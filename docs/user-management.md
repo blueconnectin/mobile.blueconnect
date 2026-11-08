@@ -11,9 +11,9 @@
 
 ## Batas fungsi penghubung
 
-Semua pengaturan hubungan masih berstatus `pending_review`. Tidak ada endpoint approve/activate pada versi ini. Penyimpanan pengaturan tidak membuat profil di Project/Payment, tidak mengubah role pada aplikasi tujuan, dan tidak mengubah kepemilikan transaksi. Daftar akun lama, preview tagihan, dan eksekusi provisioning membutuhkan konektor tujuan. Payment belum diperiksa, sehingga perannya memakai REVIEW_REQUIRED dan riwayat tidak disentuh.
+Project kini mendukung Verifikasi dan Terapkan untuk akun lama maupun profil baru. Lihat [panduan hubungan Project](project-account-links.md). Payment tetap pending_review; daftar akun lama dan preview tagihan Payment belum tersedia. Pengaturan Payment tidak mengubah riwayat atau akses aplikasi tersebut.
 
-Akun Project yang sudah dipetakan melalui konfigurasi existing tetap berjalan. Pendaftaran UID existing ke database menyalin pemetaan Project dari konfigurasi awal untuk mempertahankan aksesnya. Pembuatan akun Firebase baru tidak otomatis memberi akses Project; permintaan profil baru perlu tahap implementasi provisioning berikutnya.
+Akun Project yang sudah dipetakan melalui konfigurasi existing tetap berjalan. Pendaftaran UID existing ke database menyalin pemetaan Project dari konfigurasi awal untuk mempertahankan aksesnya. Pembuatan akun Firebase baru tidak langsung memberi akses Project; buat permintaan profil baru, verifikasi, lalu terapkan.
 
 Penonaktifan di halaman admin memblokir API portal pada request berikutnya. Ini bukan penghapusan akun Firebase atau logout global: sesi Project/Payment yang sudah diterbitkan mengikuti mekanisme existing. Jangan menyebut akun tersebut telah dicabut dari seluruh aplikasi.
 
