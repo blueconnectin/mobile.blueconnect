@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 function setup(fail=false){
- const nodes={}; for(const id of ['status','login-form','email','password','reset','logout','login','home','identity','submit','project-link','payment-link','access-status','retry-access']) nodes[id]={textContent:'',value:'',hidden:false,disabled:false,events:{},addEventListener(k,fn){this.events[k]=fn},reportValidity(){return !!this.value}};
+ const nodes={}; for(const id of ['status','login-form','email','password','reset','logout','login','home','identity','submit','project-link','payment-link','access-status','retry-access','sso-note']) nodes[id]={textContent:'',value:'',hidden:false,disabled:false,events:{},addEventListener(k,fn){this.events[k]=fn},reportValidity(){return !!this.value}};
  let observer; const calls=[];
  const context={document:{getElementById:id=>nodes[id],querySelectorAll:()=>[nodes.submit,nodes.reset,nodes.logout]},initializeApp:c=>c,getAuth:()=>({}),browserSessionPersistence:'session',setPersistence:async()=>calls.push('persistence'),signInWithEmailAndPassword:async(a,e,p)=>{calls.push([e,p]);if(fail)throw {code:'auth/invalid-credential'}},onAuthStateChanged:(a,fn)=>observer=fn,signOut:async()=>calls.push('logout'),sendPasswordResetEmail:async()=>calls.push('reset')};
  vm.runInNewContext(fs.readFileSync(__dirname+'/../public/app.js','utf8').replace(/^import .*;\n/gm,''),context);
