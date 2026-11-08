@@ -52,17 +52,29 @@ async function load(){
 async function action(fn,feedback){if(busy)return;busy=true;if(feedback)feedback.textContent='Memproses permintaan Project…';document.querySelectorAll('button').forEach(b=>b.disabled=true);try{await fn();}catch(e){const text=e.message||'Permintaan gagal.';message(text);if(feedback)feedback.textContent=text;}finally{busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false);}}
 $('refresh').addEventListener('click',()=>action(load));
 $('create-mode').addEventListener('change',()=>{$('uid-field').hidden=$('create-mode').value==='new';$('user-uid').required=$('create-mode').value==='existing';});
+$('new-project').addEventListener('change',()=>{$('new-role-field').hidden=!$('new-project').checked;});
 $('user-form').addEventListener('submit',event=>{event.preventDefault();action(async()=>{
  // Verify administrator and database readiness before creating an Auth identity.
  await api('users');
+ const projectRequested=$('new-project').checked,projectRole=$('new-project-role').value;
  const email=$('user-email').value.trim(),name=$('user-name').value.trim();let uid=$('user-uid').value.trim(),created=false;
  if($('create-mode').value==='new'){
   const secondary=initializeApp(config,'provision-'+crypto.randomUUID());const secondaryAuth=getAuth(secondary);
   try{await setPersistence(secondaryAuth,inMemoryPersistence);const password=Array.from(crypto.getRandomValues(new Uint8Array(32)),x=>x.toString(16).padStart(2,'0')).join('');const result=await createUserWithEmailAndPassword(secondaryAuth,email,password);uid=result.user.uid;created=true;await signOut(secondaryAuth);}finally{await deleteApp(secondary);}
  }
  try{await api('users',{uid,email,name,active:true});}catch(error){if(created){$('create-mode').value='existing';$('uid-field').hidden=false;$('user-uid').value=uid;message('Akun Firebase sudah dibuat, tetapi penyimpanan akses belum terkonfirmasi. UID: '+uid+'. Muat ulang daftar sebelum mencoba mendaftarkan akun existing.');return;}throw error;}
+ let projectReady=false,projectError='';
+ if(projectRequested){
+  try{
+   message('Akun Mobile tersimpan. Menyiapkan akses Project…');
+   const request=await api('link-requests',{uid,application:'project',mode:'new',role:projectRole,confirmed:true});
+   await api('verify-project-link',{id:request.id});
+   await api('apply-project-link',{id:request.id,confirmed:true});
+   projectReady=true;
+  }catch(error){projectError=error.message||'Koneksi Project gagal.';}
+ }
  let sent=false;if(created){try{await sendPasswordResetEmail(auth,email);sent=true;}catch{}}
- $('user-form').reset();$('uid-field').hidden=true;await load();message(created?(sent?'Akun dibuat. Email pengaturan password telah diminta; periksa inbox/spam pengguna.':'Akun dibuat, tetapi email pengaturan password gagal dikirim. Gunakan Lupa password di portal.'):'Pengguna existing berhasil didaftarkan.');
+ $('user-form').reset();$('uid-field').hidden=true;$('new-role-field').hidden=true;await load();message((created?(sent?'Akun dibuat. Email pengaturan password telah diminta; periksa inbox/spam pengguna.':'Akun dibuat, tetapi email pengaturan password gagal dikirim. Gunakan Lupa password di portal.'):'Pengguna existing berhasil didaftarkan.')+(projectReady?' Akses Project aktif dengan profil baru.':projectRequested?' Akun Mobile tersimpan, tetapi akses Project belum selesai: '+projectError+' Lanjutkan permintaan di bagian Hubungkan akun; jangan buat akun Mobile ulang.':''));
  });});
 function roles(){const payment=$('application').value==='payment';$('role').replaceChildren();for(const role of payment?['REVIEW_REQUIRED']:['UPLOADER','OPERATOR','SUPERVISOR','PLANNING','PROJEK','ADMIN']){const option=node('option',payment?'Ditentukan setelah pemeriksaan Payment':role);option.value=role;$('role').append(option);}}
 $('application').addEventListener('change',roles);roles();

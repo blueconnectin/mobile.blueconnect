@@ -87,11 +87,12 @@ export async function adminApi(request,env,claims){
   const user=await db.prepare('SELECT uid FROM portal_users WHERE uid=?').bind(input.uid).first();if(!user)throw err('USER_NOT_FOUND',404);
   if(item.application==='project'&&item.legacyId){const used=await db.prepare('SELECT uid FROM portal_users WHERE project_user_id=? AND uid<>?').bind(item.legacyId,input.uid).first();if(used)throw err('ACCOUNT_ALREADY_LINKED',409);}
   const conflict=await db.prepare("SELECT id FROM account_requests WHERE status='pending_review' AND (uid=? AND application=? OR legacy_id=? AND application=?)").bind(input.uid,item.application,item.legacyId,item.application).first();if(conflict)throw err('REQUEST_ALREADY_PENDING',409);
+  const requestId=crypto.randomUUID();
   try {await db.batch([
-   db.prepare('INSERT INTO account_requests(id,uid,application,mode,legacy_id,requested_role,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(crypto.randomUUID(),input.uid,item.application,item.mode,item.legacyId,item.role,claims.sub,at),
+   db.prepare('INSERT INTO account_requests(id,uid,application,mode,legacy_id,requested_role,created_by,created_at) VALUES(?,?,?,?,?,?,?,?)').bind(requestId,input.uid,item.application,item.mode,item.legacyId,item.role,claims.sub,at),
    audit(db,claims.sub,'REQUEST_ACCOUNT_LINK',input.uid,item,at)
   ]);}catch(error){if(/UNIQUE constraint/i.test(String(error)))throw err('REQUEST_ALREADY_PENDING',409);throw error;}
-  return {success:true,status:'pending_review'};
+  return {success:true,status:'pending_review',id:requestId};
  }
  throw err('NOT_FOUND',404);
 }
