@@ -50,6 +50,7 @@ $('project-link').addEventListener('click', event => {
 async function loadAccess(user) {
   const generation = ++accessGeneration;
   projectSsoEnabled = false;
+  $('admin-link').hidden = true;
   $('project-link').hidden = true;
   $('payment-link').hidden = true;
   $('access-status').textContent = user ? 'Memeriksa akses…' : '';
@@ -70,6 +71,7 @@ async function loadAccess(user) {
     }
     const data = await response.json();
     if (generation !== accessGeneration) return;
+    $('admin-link').hidden = data.admin !== true;
     projectSsoEnabled = data.sso?.project === true && location.origin === 'https://mobile.blueconnect.id';
     $('project-link').hidden = data.apps?.project !== true;
     $('sso-note').textContent = projectSsoEnabled ? 'Proyek dibuka dengan akun portal. Payment masih menggunakan login terpisah.' : 'Integrasi satu login belum aktif. Aplikasi masih menggunakan login masing-masing.';
