@@ -8,3 +8,19 @@ function setup(failure){
 }
 test('verification error is visible beside the clicked button and button recovers',async()=>{const t=setup(true);await t.ctx.load();const verify=t.all.find(e=>e.textContent==='Verifikasi akun');const running=verify.events.click();assert.match(t.nodes.requests.textContent,/Memproses permintaan/);await running;assert.match(t.nodes.requests.textContent,/PROJECT_GOOGLE_AUTH_REQUIRED/);assert.match(t.nodes.requests.textContent,/otorisasi Google/);assert.equal(verify.disabled,false)});
 test('successful verification replaces progress with account preview and apply button',async()=>{const t=setup(false);await t.ctx.load();await t.all.find(e=>e.textContent==='Verifikasi akun').events.click();assert.match(t.nodes.requests.textContent,/Akun Project: admin/);assert.match(t.nodes.requests.textContent,/Terapkan hubungan akun/);assert.doesNotMatch(t.nodes.requests.textContent,/Memproses permintaan/)});
+
+test('non-JSON platform failure shows HTTP status and safe reference without response body',async()=>{
+ const t=setup(false);await t.ctx.load();
+ t.ctx.fetch=async()=>({ok:false,status:502,headers:{get:()=> '1234567890abcdef-SIN'},json:async()=>{throw Error('<html>private diagnostics</html>')}});
+ await t.all.find(e=>e.textContent==='Verifikasi akun').events.click();
+ assert.match(t.nodes.requests.textContent,/HTTP 502/);
+ assert.match(t.nodes.requests.textContent,/1234567890abcdef-SIN/);
+ assert.doesNotMatch(t.nodes.requests.textContent,/private diagnostics/);
+ assert.equal(t.all.find(e=>e.textContent==='Verifikasi akun').disabled,false);
+});
+test('invalid JSON shape fails visibly without showing untrusted header text',async()=>{
+ const t=setup(false);await t.ctx.load();
+ t.ctx.fetch=async()=>({ok:true,status:200,json:async()=>null});
+ await t.all.find(e=>e.textContent==='Verifikasi akun').events.click();
+ assert.match(t.nodes.requests.textContent,/Format respons API tidak sesuai/);
+});
