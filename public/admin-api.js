@@ -1,3 +1,4 @@
+import {ensureLinkTables,projectAuthorization,processProjectLink} from './project-links.js';
 // Imported only by the Worker. No credentials or data embedded in this module.
 export function isPortalAdmin(uid, env) {
   try { const ids=JSON.parse(env.PORTAL_ADMIN_UIDS || '[]'); return Array.isArray(ids) && ids.includes(uid); }
@@ -32,9 +33,11 @@ export async function adminApi(request,env,claims){
  if(!isPortalAdmin(claims.sub,env))throw err('ADMIN_REQUIRED',403);
  if(!env.PORTAL_DB)throw err('DATABASE_NOT_CONFIGURED',503);
  const db=env.PORTAL_DB,url=new URL(request.url),at=new Date().toISOString();
+ await ensureLinkTables(db);
+ if(request.method==='GET'&&url.pathname==='/api/admin/project-authorization')return projectAuthorization(env,claims,url);
  if(request.method==='GET'&&url.pathname==='/api/admin/users'){
   const users=await db.prepare('SELECT uid,email,name,active,project_enabled,project_user_id,revision,updated_at FROM portal_users ORDER BY name LIMIT 200').all();
-  const requests=await db.prepare("SELECT * FROM account_requests WHERE status='pending_review' ORDER BY created_at DESC LIMIT 200").all();
+  const requests=await db.prepare("SELECT r.* FROM account_requests r WHERE r.status='pending_review' AND NOT EXISTS(SELECT 1 FROM account_link_applied a WHERE a.request_id=r.id) ORDER BY r.created_at DESC LIMIT 200").all();
   return {users:users.results,requests:requests.results};
  }
  if(request.method==='GET'&&url.pathname==='/api/admin/audit')return {events:(await db.prepare('SELECT * FROM portal_audit ORDER BY created_at DESC LIMIT 100').all()).results};
@@ -44,6 +47,8 @@ export async function adminApi(request,env,claims){
  const raw=await request.text();if(raw.length>12000)throw err('PAYLOAD_TOO_LARGE',413);
  let input;try{input=JSON.parse(raw);}catch{throw err('INVALID_JSON');}
  if(!input||typeof input!=='object'||Array.isArray(input))throw err('INVALID_JSON');
+ if(url.pathname==='/api/admin/verify-project-link')return processProjectLink(request,env,claims,input,false);
+ if(url.pathname==='/api/admin/apply-project-link')return processProjectLink(request,env,claims,input,true);
  if(url.pathname==='/api/admin/users'){
   const user=validateUser(input);
   if(!user.active && isPortalAdmin(user.uid,env))throw err('ADMIN_DEACTIVATION_REQUIRES_CONFIGURATION',409);
@@ -70,10 +75,10 @@ export async function adminApi(request,env,claims){
  }
  if(url.pathname==='/api/admin/cancel-request'){
   if(typeof input.id!=='string')throw err('INVALID_REQUEST');
-  const item=await db.prepare("SELECT * FROM account_requests WHERE id=? AND status='pending_review'").bind(input.id).first();if(!item)throw err('REQUEST_NOT_PENDING',409);
+  const item=await db.prepare("SELECT r.* FROM account_requests r WHERE r.id=? AND r.status='pending_review' AND NOT EXISTS(SELECT 1 FROM account_link_applied a WHERE a.request_id=r.id)").bind(input.id).first();if(!item)throw err('REQUEST_NOT_PENDING',409);
   await db.batch([
-   db.prepare("INSERT INTO portal_audit(id,actor_uid,action,target_uid,detail,created_at) SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM account_requests WHERE id=? AND status='pending_review')").bind(crypto.randomUUID(),claims.sub,'CANCEL_ACCOUNT_LINK',item.uid,JSON.stringify({id:input.id}),at,input.id),
-   db.prepare("UPDATE account_requests SET status='cancelled' WHERE id=? AND status='pending_review'").bind(input.id)
+   db.prepare("INSERT INTO portal_audit(id,actor_uid,action,target_uid,detail,created_at) SELECT ?,?,?,?,?,? WHERE EXISTS (SELECT 1 FROM account_requests WHERE id=? AND status='pending_review' AND NOT EXISTS(SELECT 1 FROM account_link_applied WHERE request_id=account_requests.id))").bind(crypto.randomUUID(),claims.sub,'CANCEL_ACCOUNT_LINK',item.uid,JSON.stringify({id:input.id}),at,input.id),
+   db.prepare("UPDATE account_requests SET status='cancelled' WHERE id=? AND status='pending_review' AND NOT EXISTS(SELECT 1 FROM account_link_applied WHERE request_id=account_requests.id)").bind(input.id)
   ]);return {success:true};
  }
  if(url.pathname==='/api/admin/link-requests'){
