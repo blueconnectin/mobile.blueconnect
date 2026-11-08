@@ -1,3 +1,4 @@
+import { adminApi, isPortalAdmin, databaseMember } from './admin-api.js';
 // Cloudflare Pages advanced-mode Worker. Configuration stays in server bindings.
 const PROJECT_ID = 'blue-connect-mobile';
 const JWKS_URL = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
@@ -67,19 +68,20 @@ function json(value, status = 200) {
 }
 export async function handle(request, env, verifier = verifyToken) {
   const url = new URL(request.url);
-  if (url.pathname === '/api/me' || url.pathname === '/api/project/identity') {
-    if (request.method !== 'GET') return json({ error: 'METHOD_NOT_ALLOWED' }, 405);
+  if (url.pathname === '/api/me' || url.pathname === '/api/project/identity' || url.pathname.startsWith('/api/admin/')) {
+    if (!url.pathname.startsWith('/api/admin/') && request.method !== 'GET') return json({ error: 'METHOD_NOT_ALLOWED' }, 405);
     const authorization = request.headers.get('Authorization') || '';
     if (!authorization.startsWith('Bearer ') || authorization.length > 16007) return json({ error: 'UNAUTHENTICATED' }, 401);
     try {
       const claims = await verifier(authorization.slice(7));
-      const member = getMember(claims.sub, env);
+      const member = await databaseMember(claims.sub, env) || getMember(claims.sub, env);
+      if (url.pathname.startsWith('/api/admin/')) return json(await adminApi(request, env, claims));
       if (url.pathname === '/api/project/identity') {
         if (env.PROJECT_SSO_ENABLED !== 'true') return json({ error: 'SSO_DISABLED' }, 503);
         if (!member.project) return json({ error: 'ACCESS_DENIED' }, 403);
         return json({ audience: 'blueconnect-project', uid: claims.sub, userId: member.projectUserId, expiresAt: claims.exp });
       }
-      return json({ user: { uid: claims.sub, name: member.name }, apps: { project: member.project, payment: member.payment }, sso: { project: member.project && env.PROJECT_SSO_ENABLED === 'true', payment: false } });
+      return json({ user: { uid: claims.sub, name: member.name }, admin: isPortalAdmin(claims.sub, env), apps: { project: member.project, payment: member.payment }, sso: { project: member.project && env.PROJECT_SSO_ENABLED === 'true', payment: false } });
     } catch (error) { return json({ error: error.status ? error.message : 'SERVICE_UNAVAILABLE' }, error.status || 503); }
   }
   if (url.pathname.startsWith('/api/')) return json({ error: 'NOT_FOUND' }, 404);
