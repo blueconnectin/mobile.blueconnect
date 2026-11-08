@@ -10,7 +10,13 @@ async function api(path,body){
  if(!auth.currentUser)throw Error('Silakan login melalui portal.');
  const token=await auth.currentUser.getIdToken();
  const response=await fetch('/api/admin/'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store'});
- let data;try{data=await response.json();}catch{throw Error('Server mengirim respons yang tidak dapat dibaca. Muat ulang halaman dan coba kembali.');}
+ let data;try{data=await response.json();}catch{
+ const status=Number.isInteger(response.status)?response.status:0;
+ const ray=response.headers?.get('cf-ray')||'';
+ const reference=/^[a-f0-9]{16,32}(?:-[A-Z]{3})?$/i.test(ray)?' · Referensi '+ray:'';
+ throw Error('Respons server tidak dapat dibaca [HTTP '+status+reference+']. Muat ulang halaman dan coba kembali. Jika tetap gagal, kirim tangkapan layar pesan ini.');
+ }
+ if(!data || typeof data!=='object' || Array.isArray(data))throw Error('Format respons API tidak sesuai [HTTP '+response.status+'].');
  if(!response.ok){const code=typeof data.error==='string' && /^[A-Z_]{1,80}$/.test(data.error)?data.error:'';throw Error((errors[code]||'Permintaan gagal. Periksa data dan coba lagi.')+(code?' ['+code+']':''));}return data;
 }
 function node(tag,text){const el=document.createElement(tag);el.textContent=text;return el;}
