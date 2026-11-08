@@ -46,4 +46,6 @@ Lihat [panduan aktivasi](docs/project-sso.md). Adapter dan installer berada di `
 
 ## Pengaturan pengguna
 
-Menu Manajemen Pengguna dan Hubungkan Akun tersedia setelah binding D1 dan UID administrator dikonfigurasi. Ikuti [panduan aktivasi](docs/user-management.md). Pengaturan hubungan akun disimpan sebagai menunggu verifikasi; konektor provisioning Project dan Payment belum diaktifkan. Penonaktifan portal belum mencabut sesi aplikasi lain.
+Menu Manajemen Pengguna dan Hubungkan Akun tersedia setelah binding D1 dan UID administrator dikonfigurasi. Ikuti [panduan aktivasi](docs/user-management.md). Hubungan Project mendukung Verifikasi dan Terapkan untuk akun lama maupun profil baru. Payment tetap menunggu verifikasi konektor. Penonaktifan portal belum mencabut sesi aplikasi lain.
+
+Panduan [Verifikasi dan Terapkan Project](docs/project-account-links.md).
