@@ -21,3 +21,12 @@ const env={PORTAL_MEMBERS_JSON:JSON.stringify({'member-1':{active:true,name:'Use
 test('API verifies identity and returns only configured access',async()=>{const response=await handle(new Request('https://mobile.blueconnect.id/api/me',{headers:{Authorization:'Bearer '+await token()}}),env,t=>verifyToken(t,opts));assert.equal(response.status,200);assert.equal(response.headers.get('Cache-Control'),'no-store');const body=await response.json();assert.deepEqual(body.apps,{project:true,payment:false});assert.equal(body.sso.project,false);assert.equal(JSON.stringify(body).includes('USR-123'),false)});
 test('API refuses missing token, invalid token and disabled membership',async()=>{assert.equal((await handle(new Request('https://mobile.blueconnect.id/api/me'),env)).status,401);assert.equal((await handle(new Request('https://mobile.blueconnect.id/api/me',{headers:{Authorization:'Bearer forged'}}),env)).status,401);const r=await handle(new Request('https://mobile.blueconnect.id/api/me',{headers:{Authorization:'Bearer '+await token()}}),{PORTAL_MEMBERS_JSON:'{}'},t=>verifyToken(t,opts));assert.equal(r.status,403)});
 test('client-controlled query cannot grant access',async()=>{const r=await handle(new Request('https://mobile.blueconnect.id/api/me?uid=member-1&role=ADMIN',{headers:{Authorization:'Bearer '+await token({sub:'attacker'})}}),env,t=>verifyToken(t,opts));assert.equal(r.status,403)});
+test('SSO identity is disabled by default and requires project membership',async()=>{
+ const request=()=>new Request('https://mobile.blueconnect.id/api/project/identity',{headers:{Authorization:'Bearer placeholder'}});
+ const verify=async()=>({sub:'member-1',exp:now+300});
+ assert.equal((await handle(request(),env,verify)).status,503);
+ const enabled={...env,PROJECT_SSO_ENABLED:'true'};
+ const response=await handle(request(),enabled,verify);
+ assert.deepEqual(await response.json(),{audience:'blueconnect-project',uid:'member-1',userId:'USR-123',expiresAt:now+300});
+ assert.equal((await handle(request(),{PROJECT_SSO_ENABLED:'true',PORTAL_MEMBERS_JSON:'{"member-1":{"active":true,"project":{"enabled":false,"userId":"USR-123"}}}'},verify)).status,403);
+});
