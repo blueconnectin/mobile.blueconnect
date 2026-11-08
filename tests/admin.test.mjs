@@ -69,3 +69,19 @@ test('upstream errors map to safe diagnostics without reflecting arbitrary backe
  assert.equal(projectRemoteError({error:{message:'INVALID_REQUEST'}}),'PROJECT_BACKEND_OUTDATED');
  assert.equal(projectRemoteError({error:{message:'private-data bearer xyz'}}),'PROJECT_VERIFICATION_FAILED');
 });
+
+import {remote} from '../public/project-links.js';
+test('Project connector follows Apps Script ContentService redirect to JSON result',async()=>{
+ const original=globalThis.fetch;
+ try{
+  globalThis.fetch=async(url,options)=>{
+   assert.equal(options.redirect,'follow');
+   assert.equal(options.method,'POST');
+   assert.equal(options.headers.Authorization,undefined);
+   assert.equal(JSON.parse(options.body).method,'verifyPortalAccountLink');
+   return Response.json({ok:true,result:{profile:{userId:'USR-test'}}});
+  };
+  const result=await remote({},new Request('https://mobile.blueconnect.id/api/admin/verify-project-link',{headers:{Authorization:'Bearer test-token'}}),'verifyPortalAccountLink','request');
+  assert.equal(result.userId,'USR-test');
+ }finally{globalThis.fetch=original;}
+});

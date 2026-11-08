@@ -31,12 +31,12 @@ export function projectRemoteError(data) {
  if(/permission|authorization is required|otorisasi|izin.*UrlFetchApp/i.test(code))return 'PROJECT_GOOGLE_AUTH_REQUIRED';
  return 'PROJECT_VERIFICATION_FAILED';
 }
-async function remote(env,request,method,id){
+export async function remote(env,request,method,id){
  const url=env.PROJECT_APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzCiIpWJZiO0d6EiBXGZHMLLEWvbPj5vapmryLEHXKYB7TooJKpIbSUpAXro1EQN-w/exec';
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url))throw fail('PROJECT_CONNECTOR_NOT_CONFIGURED',503);
  const token=(request.headers.get('Authorization')||'').slice(7);
  let response,data;
- try{response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol:1,method,args:[token,id],sessionToken:''}),signal:AbortSignal.timeout(45000)});}
+ try{response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol:1,method,args:[token,id],sessionToken:''}),redirect:'follow',signal:AbortSignal.timeout(45000)});}
  catch{throw fail('PROJECT_CONNECTION_FAILED',502);}
  if(!response.ok)throw fail('PROJECT_UPSTREAM_REJECTED',502);
  try{data=await response.json();}catch{throw fail('PROJECT_RESPONSE_NOT_JSON',502);}
