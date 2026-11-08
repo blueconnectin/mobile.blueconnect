@@ -24,16 +24,27 @@ function profileValid(profile,row){
  if(row.mode==='link'&&profile.userId!==row.legacy_id)throw fail('PROJECT_ACCOUNT_INVALID');
  return {userId:profile.userId,username:profile.username,name:profile.name,role:profile.role,status:profile.status};
 }
+export function projectRemoteError(data) {
+ const code=String(data?.error?.message||data?.error?.code||'');
+ const known={PORTAL_ADMIN_REQUIRED:'PROJECT_ADMIN_AUTH_FAILED',PORTAL_AUTH_FAILED:'PROJECT_ADMIN_AUTH_FAILED',PORTAL_USER_NOT_FOUND:'PROJECT_USER_NOT_FOUND',PORTAL_ACCOUNT_ROLE_OR_STATUS_CHANGED:'PROJECT_ACCOUNT_ROLE_OR_STATUS_CHANGED',PORTAL_DUPLICATE_USER:'PROJECT_ACCOUNT_INVALID',PORTAL_ACCOUNT_COLLISION:'ACCOUNT_ALREADY_LINKED',INVALID_REQUEST:'PROJECT_BACKEND_OUTDATED'};
+ if(known[code])return known[code];
+ if(/permission|authorization is required|otorisasi|izin.*UrlFetchApp/i.test(code))return 'PROJECT_GOOGLE_AUTH_REQUIRED';
+ return 'PROJECT_VERIFICATION_FAILED';
+}
 async function remote(env,request,method,id){
  const url=env.PROJECT_APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbzCiIpWJZiO0d6EiBXGZHMLLEWvbPj5vapmryLEHXKYB7TooJKpIbSUpAXro1EQN-w/exec';
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url))throw fail('PROJECT_CONNECTOR_NOT_CONFIGURED',503);
  const token=(request.headers.get('Authorization')||'').slice(7);
  let response,data;
- try{response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol:1,method,args:[token,id],sessionToken:''}),signal:AbortSignal.timeout(45000)});data=await response.json();}
+ try{response=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({protocol:1,method,args:[token,id],sessionToken:''}),signal:AbortSignal.timeout(45000)});}
  catch{throw fail('PROJECT_CONNECTION_FAILED',502);}
- if(!response.ok||!data?.ok||!data.result?.profile)throw fail('PROJECT_VERIFICATION_FAILED',502);
+ if(!response.ok)throw fail('PROJECT_UPSTREAM_REJECTED',502);
+ try{data=await response.json();}catch{throw fail('PROJECT_RESPONSE_NOT_JSON',502);}
+ if(!data?.ok)throw fail(projectRemoteError(data),502);
+ if(!data.result?.profile)throw fail('PROJECT_VERIFICATION_FAILED',502);
  return data.result.profile;
 }
+
 export async function projectAuthorization(env,claims,url){
  const db=env.PORTAL_DB,row=await context(db,url.searchParams.get('requestId'));
  const apply=url.searchParams.get('phase')==='apply';
