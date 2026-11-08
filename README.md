@@ -43,3 +43,7 @@ Source awal disalin dari branch codex/mobile-login-foundation di Starlite-Docume
 ## SSO Project
 
 Lihat [panduan aktivasi](docs/project-sso.md). Adapter dan installer berada di `integrations/project/` dan `scripts/install-project-sso.mjs`. Seluruh source integrasi disimpan di repository Mobile; salinan adapter harus dipasang di repository Project agar mengikuti pipeline deployment yang sudah ada.
+
+## Pengaturan pengguna
+
+Menu Manajemen Pengguna dan Hubungkan Akun tersedia setelah binding D1 dan UID administrator dikonfigurasi. Ikuti [panduan aktivasi](docs/user-management.md). Pengaturan hubungan akun disimpan sebagai menunggu verifikasi; konektor provisioning Project dan Payment belum diaktifkan. Penonaktifan portal belum mencabut sesi aplikasi lain.
