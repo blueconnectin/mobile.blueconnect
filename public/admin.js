@@ -4,7 +4,7 @@ const config={apiKey:'AIzaSyAGyE8As4XjSDUI6Z-as__kZ4D6y88k2ag',authDomain:'blue-
 const auth=getAuth(initializeApp(config));
 const $=id=>document.getElementById(id);
 const message=text=>{$('message').textContent=text;};
-const errors={ADMIN_REQUIRED:'Akun Anda tidak memiliki akses administrator.',DATABASE_NOT_CONFIGURED:'Penyimpanan pengaturan belum diaktifkan. Ikuti panduan aktivasi administrator.',ACCESS_DENIED:'Akses akun dinonaktifkan.',USER_ALREADY_EXISTS:'Pengguna sudah terdaftar.',REQUEST_ALREADY_PENDING:'Sudah ada pengaturan koneksi yang menunggu verifikasi.',ACCOUNT_ALREADY_LINKED:'Akun lama telah dihubungkan ke pengguna lain.',CONFLICT_REFRESH_REQUIRED:'Data berubah. Muat ulang sebelum menyimpan.',ADMIN_DEACTIVATION_REQUIRES_CONFIGURATION:'Akun administrator dilindungi. Ubah penetapan admin melalui konfigurasi pemilik.'};
+const errors={VERIFICATION_REQUIRED:'Klik Verifikasi lagi; hasil verifikasi berlaku 5 menit dan hanya untuk admin yang memeriksa.',PROJECT_ROLE_MISMATCH:'Peran akun Project berbeda dari usulan. Batalkan dan buat permintaan dengan peran akun yang benar.',PROJECT_ACCOUNT_CHANGED:'Identitas akun berubah setelah diperiksa. Verifikasi ulang.',PROJECT_VERIFICATION_FAILED:'Project belum dapat memverifikasi akun. Pastikan ID, peran, status aktif, dan deployment backend benar.',PROJECT_CONNECTION_FAILED:'Koneksi Project gagal. Coba Verifikasi kembali.',EXISTING_LINK_REASSIGNMENT_BLOCKED:'Pegawai sudah memiliki hubungan akun lain. Pemindahan hubungan perlu penanganan khusus.',PAYMENT_CONNECTOR_NOT_READY:'Konektor Payment belum diaktifkan.',ADMIN_REQUIRED:'Akun Anda tidak memiliki akses administrator.',DATABASE_NOT_CONFIGURED:'Penyimpanan pengaturan belum diaktifkan. Ikuti panduan aktivasi administrator.',ACCESS_DENIED:'Akses akun dinonaktifkan.',USER_ALREADY_EXISTS:'Pengguna sudah terdaftar.',REQUEST_ALREADY_PENDING:'Sudah ada pengaturan koneksi yang menunggu verifikasi.',ACCOUNT_ALREADY_LINKED:'Akun lama telah dihubungkan ke pengguna lain.',CONFLICT_REFRESH_REQUIRED:'Data berubah. Muat ulang sebelum menyimpan.',ADMIN_DEACTIVATION_REQUIRES_CONFIGURATION:'Akun administrator dilindungi. Ubah penetapan admin melalui konfigurasi pemilik.'};
 let generation=0,busy=false;
 async function api(path,body){
  if(!auth.currentUser)throw Error('Silakan login melalui portal.');
@@ -18,12 +18,28 @@ async function load(){
  const [data,log]=await Promise.all([api('users'),api('audit')]);if(current!==generation)return;
  $('admin-content').hidden=false;$('users').replaceChildren();$('link-uid').replaceChildren();$('requests').replaceChildren();$('audit').replaceChildren();
  for(const user of data.users){
-  const box=node('article','');box.append(node('h3',user.name),node('p',(user.email||user.uid)+' · '+(user.active?'Aktif':'Nonaktif')));
+  const box=node('article','');box.append(node('h3',user.name),node('p',(user.email||user.uid)+' · '+(user.active?'Aktif':'Nonaktif')),node('p',user.project_user_id?'Project: '+user.project_user_id:'Project belum terhubung'));
   const button=node('button',user.active?'Nonaktifkan':'Aktifkan');button.className='secondary';button.addEventListener('click',()=>action(async()=>{if(!confirm('Ubah status akses portal untuk '+user.name+'? Sesi Project/Payment yang sudah berjalan belum otomatis dicabut.'))return;await api('user-status',{uid:user.uid,active:!user.active,revision:user.revision});await load();message('Status pengguna disimpan.');}));box.append(button);$('users').append(box);
   const option=node('option',user.name+' — '+(user.email||user.uid));option.value=user.uid;$('link-uid').append(option);
  }
  if(!data.users.length)$('users').append(node('p','Belum ada pengguna yang didaftarkan melalui pengaturan ini. Akun konfigurasi awal tetap dipertahankan.'));
- for(const item of data.requests){const box=node('article','');box.append(node('p',item.application+' · '+item.uid+' · '+(item.mode==='link'?'Hubungkan '+item.legacy_id:'Profil baru')+' · '+item.requested_role+' · Menunggu verifikasi'));const cancel=node('button','Batalkan pengaturan');cancel.className='secondary';cancel.addEventListener('click',()=>action(async()=>{await api('cancel-request',{id:item.id});await load();message('Pengaturan dibatalkan. Anda dapat membuat pengaturan pengganti.');}));box.append(cancel);$('requests').append(box);}
+ for(const item of data.requests){const box=node('article','');box.append(node('p',item.application+' · '+item.uid+' · '+(item.mode==='link'?'Hubungkan '+item.legacy_id:'Profil baru')+' · '+item.requested_role+' · Menunggu verifikasi'));if(item.application==='project'){
+ const verify=node('button','Verifikasi akun');verify.className='secondary';
+ const preview=node('div','');
+ verify.addEventListener('click',()=>action(async()=>{
+  preview.replaceChildren();const data=await api('verify-project-link',{id:item.id});
+  if(data.status==='applied'){await load();message('Hubungan akun sudah diterapkan.');return;}
+  const profile=data.profile;
+  preview.append(node('p','Pegawai: '+data.employee.name),node('p','Akun Project: '+profile.username+' · '+profile.userId),node('p','Nama: '+profile.name+' · Peran: '+profile.role+' · Status: '+profile.status));
+  if(item.mode==='new')preview.append(node('p','Profil baru akan dibuat saat diterapkan.'));
+  const apply=node('button','Terapkan hubungan akun');
+  apply.addEventListener('click',()=>action(async()=>{
+   if(!confirm('Hubungkan '+data.employee.name+' ke '+profile.username+' ('+profile.role+')? Riwayat akun tujuan akan dapat diakses sesuai peran.'))return;
+   await api('apply-project-link',{id:item.id,confirmed:true});await load();message('Hubungan akun Project berhasil diterapkan. Kembali ke portal dan klik Periksa akses kembali.');
+  }));preview.append(apply);message('Periksa identitas akun sebelum menerapkan. Verifikasi berlaku 5 menit.');
+ }));box.append(verify,preview);
+ }
+ const cancel=node('button','Batalkan pengaturan');cancel.className='secondary';cancel.addEventListener('click',()=>action(async()=>{await api('cancel-request',{id:item.id});await load();message('Pengaturan dibatalkan. Anda dapat membuat pengaturan pengganti.');}));box.append(cancel);$('requests').append(box);}
  for(const item of log.events)$('audit').append(node('p',item.created_at+' · '+item.action+' · '+item.target_uid));
 }
 async function action(fn){if(busy)return;busy=true;document.querySelectorAll('button').forEach(b=>b.disabled=true);try{await fn();}catch(e){message(e.message||'Permintaan gagal.');}finally{busy=false;document.querySelectorAll('button').forEach(b=>b.disabled=false);}}
