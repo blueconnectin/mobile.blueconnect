@@ -61,3 +61,11 @@ test('server authorization returns only trusted request and requires apply proof
  await processProjectLink(fakeRequest,t.env,{sub:'admin'},{id},false,connect);
  const auth=await projectAuthorization(t.env,{sub:'admin'},url);assert.equal(auth.uid,user.uid);assert.equal(auth.role,'OPERATOR');assert.equal(auth.legacyId,'USR-123');t.sqlite.close();
 });
+
+import {projectRemoteError} from '../public/project-links.js';
+test('upstream errors map to safe diagnostics without reflecting arbitrary backend text',()=>{
+ assert.equal(projectRemoteError({error:{message:'PORTAL_USER_NOT_FOUND'}}),'PROJECT_USER_NOT_FOUND');
+ assert.equal(projectRemoteError({error:{message:'You do not have permission to call UrlFetchApp.fetch'}}),'PROJECT_GOOGLE_AUTH_REQUIRED');
+ assert.equal(projectRemoteError({error:{message:'INVALID_REQUEST'}}),'PROJECT_BACKEND_OUTDATED');
+ assert.equal(projectRemoteError({error:{message:'private-data bearer xyz'}}),'PROJECT_VERIFICATION_FAILED');
+});
