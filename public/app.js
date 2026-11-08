@@ -1,3 +1,4 @@
+import { launchProjectSso } from './project-sso.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js';
 
@@ -37,8 +38,18 @@ $('reset').addEventListener('click', () => {
 });
 $('logout').addEventListener('click', () => perform(async () => { await signOut(auth); status('Anda sudah keluar dari portal.'); }));
 let accessGeneration = 0;
+let projectSsoEnabled = false;
+let cancelProjectSso;
+$('project-link').addEventListener('click', event => {
+  if (!projectSsoEnabled) return;
+  event.preventDefault();
+  if (!auth.currentUser) { status('Silakan masuk kembali.'); return; }
+  if (cancelProjectSso) cancelProjectSso();
+  cancelProjectSso = launchProjectSso(auth.currentUser, status);
+});
 async function loadAccess(user) {
   const generation = ++accessGeneration;
+  projectSsoEnabled = false;
   $('project-link').hidden = true;
   $('payment-link').hidden = true;
   $('access-status').textContent = user ? 'Memeriksa akses…' : '';
@@ -59,7 +70,9 @@ async function loadAccess(user) {
     }
     const data = await response.json();
     if (generation !== accessGeneration) return;
+    projectSsoEnabled = data.sso?.project === true && location.origin === 'https://mobile.blueconnect.id';
     $('project-link').hidden = data.apps?.project !== true;
+    $('sso-note').textContent = projectSsoEnabled ? 'Proyek dibuka dengan akun portal. Payment masih menggunakan login terpisah.' : 'Integrasi satu login belum aktif. Aplikasi masih menggunakan login masing-masing.';
     $('payment-link').hidden = data.apps?.payment !== true;
     $('access-status').textContent = data.apps?.project || data.apps?.payment
       ? 'Akses portal terverifikasi. Pilih aplikasi di bawah.'
@@ -70,6 +83,7 @@ async function loadAccess(user) {
 }
 $('retry-access').addEventListener('click', () => loadAccess(auth.currentUser));
 onAuthStateChanged(auth, user => {
+  if (cancelProjectSso) { cancelProjectSso(); cancelProjectSso = null; }
   $('login').hidden = Boolean(user);
   $('home').hidden = !user;
   $('identity').textContent = user?.email || '';
