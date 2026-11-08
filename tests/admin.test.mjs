@@ -85,3 +85,14 @@ test('Project connector follows Apps Script ContentService redirect to JSON resu
   assert.equal(result.userId,'USR-test');
  }finally{globalThis.fetch=original;}
 });
+
+test('handled connector failures retain safe codes as failed dependencies',async()=>{
+ const original=globalThis.fetch;
+ const request=new Request('https://mobile.blueconnect.id/api/admin/verify-project-link',{headers:{Authorization:'Bearer test-token'}});
+ try{
+  for(const [response,code] of [[Response.json({ok:false,error:{message:'PORTAL_ADMIN_REQUIRED'}}),'PROJECT_ADMIN_AUTH_FAILED'],[new Response('<html>private</html>'),'PROJECT_RESPONSE_NOT_JSON'],[new Response('',{status:403}),'PROJECT_UPSTREAM_REJECTED']]){
+   globalThis.fetch=async()=>response;
+   await assert.rejects(remote({},request,'verifyPortalAccountLink','request'),error=>error.status===424&&error.message===code);
+  }
+ }finally{globalThis.fetch=original;}
+});
