@@ -13,7 +13,7 @@ Target domain: mobile.blueconnect.id. Frontend Cloudflare Pages dan Firebase Aut
 
 ## Status integrasi
 
-SSO Project/Payment belum aktif. Tautan masih membuka aplikasi existing dengan login masing-masing. Logout portal belum mengakhiri sesi aplikasi lainnya. HRIS, Finance, PWA install/offline belum diimplementasikan. Tidak ada data perusahaan dalam frontend ini.
+Kode SSO Project tersedia, tetapi default nonaktif hingga adapter Project dipasang dan konfigurasi diaktifkan. Payment masih memakai login terpisah. Logout portal belum mengakhiri sesi aplikasi lainnya. HRIS, Finance, PWA install/offline belum diimplementasikan. Tidak ada data perusahaan dalam frontend ini.
 
 Pemeriksaan akses ini melindungi API portal, bukan endpoint Project/Payment; keduanya tetap memiliki pemeriksaan sesi sendiri. Integrasi berikutnya harus memverifikasi pertukaran identitas pada backend Apps Script juga, karena endpoint Apps Script dapat diakses langsung.
 
@@ -38,4 +38,8 @@ Cloudflare Pages: repository ini, branch main, framework None, build command kos
 
 Konfigurasi web Firebase bukan private key. Jangan commit password, daftar pegawai, service account atau token Cloudflare. Akun Firebase dibuat administrator; tidak ada UI pendaftaran mandiri. Keamanan data tetap bergantung pada membership backend, bukan ketiadaan tombol daftar.
 
-Source awal disalin dari branch codex/mobile-login-foundation di Starlite-Documentation-Apps. Seluruh perubahan portal selanjutnya disimpan di repository ini. Belum ada deployment yang dikonfirmasi.
+Source awal disalin dari branch codex/mobile-login-foundation di Starlite-Documentation-Apps. Seluruh perubahan portal selanjutnya disimpan di repository ini. Deployment otomatis portal telah dikonfirmasi pengguna pada commit uji b497929. SSO belum diverifikasi pada akun nyata.
+
+## SSO Project
+
+Lihat [panduan aktivasi](docs/project-sso.md). Adapter dan installer berada di `integrations/project/` dan `scripts/install-project-sso.mjs`. Seluruh source integrasi disimpan di repository Mobile; salinan adapter harus dipasang di repository Project agar mengikuti pipeline deployment yang sudah ada.
