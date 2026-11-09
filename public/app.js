@@ -13,7 +13,19 @@ async function perform(action) {
   for (const button of document.querySelectorAll('button')) button.disabled = true;
   status('Memproses…');
   try { await action(); } catch(error) {
-    status(error.code === 'auth/too-many-requests' ? 'Terlalu banyak percobaan. Coba lagi nanti.' : error.code === 'auth/network-request-failed' ? 'Koneksi terputus. Periksa internet Anda.' : 'Permintaan belum berhasil. Periksa data akun atau hubungi administrator.');
+    const code=typeof error?.code==='string' && /^auth\/[a-z-]{1,80}$/.test(error.code)?error.code:'';
+    const messages={
+      'auth/invalid-credential':'Email atau password tidak cocok. Pastikan email sama dengan akun pada daftar pengguna dan gunakan password terbaru.',
+      'auth/wrong-password':'Email atau password tidak cocok. Gunakan password terbaru.',
+      'auth/user-not-found':'Email atau password tidak cocok. Periksa email pada daftar pengguna.',
+      'auth/invalid-email':'Format email tidak valid.',
+      'auth/user-disabled':'Akun dinonaktifkan di Firebase Authentication. Hubungi administrator.',
+      'auth/too-many-requests':'Terlalu banyak percobaan. Coba lagi nanti.',
+      'auth/network-request-failed':'Koneksi terputus. Periksa internet Anda.',
+      'auth/operation-not-allowed':'Metode login email/password belum diizinkan oleh Firebase.',
+      'auth/web-storage-unsupported':'Browser tidak mengizinkan penyimpanan sesi. Coba browser lain atau izinkan penyimpanan situs.'
+    };
+    status((messages[code]||'Permintaan belum berhasil. Hubungi administrator dengan kode error berikut.')+(code?' ['+code+']':' [LOGIN_ERROR]'));
   } finally {
     busy = false;
     for (const button of document.querySelectorAll('button')) button.disabled = false;
